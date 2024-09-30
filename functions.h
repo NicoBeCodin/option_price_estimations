@@ -5,11 +5,12 @@
 
 double normalCDF(double x);
 double bsOptionPrice(bool call, double s, double k, double r, double t, double sigma);
-double binomialOptionPrice(bool call, double s, double k, double r, double t, double sigma, int n);
+double binomialOptionPrice(bool call, double s, double k, double r, double t, double sigma, int n, bool show_steps);
 double calculateAverage(const std::vector<double>& values);
 double impliedVolatility(double S, double K, double T, double r, double marketPrice, double tol, int maxIter);
+
 struct Asset {
-    const char* name;
+    std::string name;
     double price;
     double drift;
     double volatility;
@@ -43,13 +44,13 @@ public:
 class MonteCarloSimulation {
 private:
     int iterations;
-    double duration;
+    int duration;
     double increment;
     Asset stock;
+    bool show;
 
 public: 
-    MonteCarloSimulation(int iter, double durat, double dt, Asset stock);
-    double simulateOption(Option option);
-
+    MonteCarloSimulation(int iter, int durat, double dt, Asset stock, bool show);
+    double estimateOption(Option option);
 };
-#endif // FUNCTIONS_H
+#endif // 
