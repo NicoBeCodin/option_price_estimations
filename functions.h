@@ -30,11 +30,12 @@ private:
     double sigma;
     double dt;
     std::mt19937 gen;
+    bool keep_going;
 
     double generateNormal(double mean, double stddev);
 
 public:
-    WeinerProcessSimulator(double initialPrice,double drift, double volatility, double timeStep);
+    WeinerProcessSimulator(double initialPrice,double drift, double volatility, double timeStep, bool keep_going);
     
     void simulateStep(bool show);
     void runSimulation(int n, int delay_ms, bool show);
@@ -48,6 +49,8 @@ private:
     double increment;
     Asset stock;
     bool show;
+    bool keep_going;
+    
 
 public: 
     MonteCarloSimulation(int iter, int durat, double dt, Asset stock, bool show);

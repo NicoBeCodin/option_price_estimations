@@ -8,6 +8,12 @@
 #include <algorithm>
 #include "functions.h"
 
+
+/*
+Project structure: 
+MonteCarlo manages the WeinerProcesses
+*/
+
 #define PRINT_STEP(show, ...) \
     do { if (show) printf(__VA_ARGS__); } while (0)
 
@@ -127,7 +133,7 @@ double impliedVolatility(double S, double K, double T, double r, double marketPr
     // If it doesn't converge, return the best guess
     return midVol;
 }
-WeinerProcessSimulator::WeinerProcessSimulator(double initialPrice,double drift, double volatility, double timeStep): price(initialPrice), mu(drift), sigma(volatility), dt(timeStep) {}
+WeinerProcessSimulator::WeinerProcessSimulator(double initialPrice,double drift, double volatility, double timeStep, bool loop): price(initialPrice), mu(drift), sigma(volatility), dt(timeStep), keep_going(loop) {}
 
 //actually geometric brownian motion
 void WeinerProcessSimulator::simulateStep(bool show){
@@ -144,12 +150,23 @@ void WeinerProcessSimulator::simulateStep(bool show){
     }
 
 void WeinerProcessSimulator::runSimulation(int n, int delay_ms, bool show){
+        if (n==-1) {
+            int j =0;
+            while (keep_going){
+                PRINT_STEP(show ,"step %d", j++);
+                simulateStep(show);
+                if (delay_ms != 0){
+                std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
+            }     
+            }
+        }
         for (int i=0; i<n; i++){
             PRINT_STEP(show, "step %d\n", i);
             simulateStep(show);
             if (delay_ms != 0){
                 std::this_thread::sleep_for(std::chrono::milliseconds(delay_ms));
             }          
+            
         }
     }
 
@@ -162,6 +179,7 @@ double WeinerProcessSimulator::generateNormal(double mean, double stddev){
 
 MonteCarloSimulation::MonteCarloSimulation(int iter, int durat, double dt, Asset stock, bool show_inc): iterations(iter), duration(durat), increment(dt), stock(stock), show(show_inc){}
 
+
 double MonteCarloSimulation::estimateOption(Option option){
     printf("Running simulation of option price...\n");
         /*
@@ -173,7 +191,7 @@ double MonteCarloSimulation::estimateOption(Option option){
 
         for (int i=0; i<iterations; i++){
             PRINT_STEP(show, "iteration %d\n", i);
-            WeinerProcessSimulator wps(stock.price, stock.drift, stock.volatility, increment);
+            WeinerProcessSimulator wps(stock.price, stock.drift, stock.volatility, increment, true);
             wps.runSimulation(duration, 0, show);
             final_stock_prices.push_back(wps.getPrice());
 
