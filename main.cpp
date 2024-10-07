@@ -27,7 +27,7 @@ void Cleanup(GLFWwindow **window);
 int main()
 {
 
-    printf("Launching simulation... \n");
+    printf("Launching program... \n");
 
     /*
         Option pricing simulation
@@ -102,11 +102,15 @@ int main()
     double stock_dri = 0.0;
     double black_scholes_price = 0.0;
     double american_option_price = 0.0;
-    bool calculate_binomial = false;
+    bool show_binomial = false;
     int tree_size = 100;
     double sim_option_strike = 110.0;
     bool call = true;
     bool calculate_montecarlo = false;
+    bool show_mcs_result = false;
+
+    double mcs_current_price;
+    double mcs_progress_bar;
 
     // Simulation characteristics
     int n_trials = 100;
@@ -150,69 +154,82 @@ int main()
         ImGui::InputDouble("risk free interest rate:", &interest_rate);
         ImGui::Checkbox("Call: (empty means put)", &call);
 
-        ImGui::Checkbox("Calculate montecarlo estimation:", &calculate_montecarlo);
         ImGui::InputInt("Number of trials: ", &n_trials);
         ImGui::InputInt("Number of steps per trial: ", &n_trial_steps);
         ImGui::InputDouble("Time to expiration (years): ", &t_sim);
         ImGui::Checkbox("Show steps in simulation:", &show);
-
-        ImGui::Checkbox("Calculate Black-Scholes price: ", &show_bs_price);
-        ImGui::Checkbox("Calculate American option: ", &calculate_binomial);
         ImGui::InputInt("Binomial tree size: ", &tree_size);
-        if (ImGui::Button("Calculate"))
+
+        if (ImGui::Button("Run MonteCarlo simulation"))
         {
-            show_result = true;
-            if (calculate_montecarlo)
+            mcs_finish = false;
+            printf("Running montecarlo simulation...");
+            stopMonteCarloThread();
+            Asset simulated_stock = {"ABC", stock_init_price, stock_dri, stock_vol, interest_rate};
+
+            double step_size = t_sim / (double)n_trial_steps;
+            MonteCarloSimulation mc_sim(n_trials, n_trial_steps, step_size, simulated_stock, show);
+            Option sim_option;
+            sim_option.stock = simulated_stock;
+            sim_option.call = call;
+            sim_option.strike = sim_option_strike;
+
+            mcs_thread = std::thread(runMonteCarloThread, std::ref(mc_sim), std::ref(sim_option));
+
+            // result = exp(-interest_rate * t_sim) * mc_sim.estimateOption(sim_option);
+            show_mcs_result = true;
+        }
+        if (show_mcs_result && !mcs_finish && mcs_running)
+        {
+            if (ImGui::Button("Stop MonteCarlo Simulation"))
             {
                 stopMonteCarloThread();
-                Asset simulated_stock = {"ABC", stock_init_price, stock_dri, stock_vol, interest_rate};
-
-                double step_size = t_sim / (double)n_trial_steps;
-                MonteCarloSimulation mc_sim(n_trials, n_trial_steps, step_size, simulated_stock, show);
-                Option sim_option;
-                sim_option.stock = simulated_stock;
-                sim_option.call = call;
-                sim_option.strike = sim_option_strike;
-                
-                mcs_thread = std::thread(runMonteCarloThread, std::ref(mc_sim), std::ref(sim_option));
-                
-                //result = exp(-interest_rate * t_sim) * mc_sim.estimateOption(sim_option);
-            }
-
-            if (show_bs_price)
-            {
-                black_scholes_price = bsOptionPrice(call, stock_init_price, sim_option_strike, interest_rate, t_sim, stock_vol);
-            }
-            if (calculate_binomial)
-            {
-                american_option_price = binomialOptionPrice(call, stock_init_price, sim_option_strike, interest_rate, t_sim, stock_vol, tree_size = 100, false);
             }
         }
-        if (show_result)
+
+        if (ImGui::Button("Calculate Black-Scholes Price"))
+        {
+            show_bs_price = true;
+            black_scholes_price = bsOptionPrice(call, stock_init_price, sim_option_strike, interest_rate, t_sim, stock_vol);
+        }
+
+        if (ImGui::Button("Calculate binomial tree"))
+        {
+            show_binomial = true;
+            american_option_price = binomialOptionPrice(call, stock_init_price, sim_option_strike, interest_rate, t_sim, stock_vol, tree_size = 100, false);
+        }
+
+        if (show_mcs_result = true)
         {
 
-            if (calculate_montecarlo){
-                double mcs_current_price;
-                double mcs_progress_bar;
-                if (mcs_running){
+            if (mcs_running && !mcs_finish)
+            {
+                {
+                    std::lock_guard<std::mutex> lock(mcs_mutex);
                     mcs_current_price = mcs_approx_price;
-                    mcs_progress_bar= mcs_progress;
-                    ImGui::Text("Simulation progress %.1f % \nApproximating price: %.2f ", mcs_progress_bar*100.0, mcs_current_price);
+                    mcs_progress_bar = mcs_progress;
                 }
-                else {
-                    ImGui::Text("MonteCarlo simulation price estimate: %.2f", mcs_current_price);
-                    }
+
+                ImGui::Text("Simulation progress %.1f % \nApproximating price: %.2f ", mcs_progress_bar * 100.0, mcs_current_price);
             }
-            if (show_bs_price)
-                ImGui::Text("Black-Scholes price: %.2f", black_scholes_price);
-            if (calculate_binomial)
-                ImGui::Text("binomial tree for american option price: %.2f", american_option_price);
+            else if (mcs_finish)
+            {
+                ImGui::Text("MonteCarlo simulation price estimate: %.2f", mcs_current_price);
+            }
+        }
+
+        if (show_bs_price)
+        {
+            ImGui::Text("Black-Scholes price: %.2f", black_scholes_price);
+        }
+
+        if (show_binomial)
+        {
+            ImGui::Text("binomial tree for american option price: %.2f", american_option_price);
         }
 
         ImGui::End();
         // End of first window
-
-
 
         // second window, simulation window
         ImGui::SetNextWindowSize(ImVec2(200, 500), ImGuiCond_FirstUseEver);
@@ -260,12 +277,12 @@ int main()
         ImGui::End();
 
         ImGui::Render();
+
         int display_w, display_h;
         glfwGetFramebufferSize(window, &display_w, &display_h);
         glViewport(0, 0, display_w, display_h);
         glClear(GL_COLOR_BUFFER_BIT);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-
         glfwSwapBuffers(window);
     }
     ImGui_ImplOpenGL3_Shutdown();

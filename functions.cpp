@@ -24,6 +24,7 @@ std::atomic<bool> mcs_running(false);
 std::atomic<bool> mcs_stop(false);
 std::atomic<double> mcs_approx_price(0.0);
 std::atomic<double> mcs_progress(0.0);
+std::atomic<bool> mcs_finish(false);
 
 std::mutex mcs_mutex;
 std::thread mcs_thread;
@@ -301,43 +302,73 @@ void runMonteCarloThread(MonteCarloSimulation &mcs, Option &option)
 {
     int i = 0;
     mcs_running = true;
-    double discount_rate = exp(- mcs.stock.interest_rate * option.t);
+    double discount_rate = exp(-mcs.stock.interest_rate * option.t);
     std::vector<double> options_profit;
     while (!mcs_stop && i < mcs.iterations)
     {
         ++i;
 
         {
-            
+
             std::lock_guard<std::mutex> lock(mcs_mutex);
             WeinerProcessSimulator wps(mcs.stock.price, mcs.stock.drift, mcs.stock.volatility, mcs.increment, true);
             wps.runSimulation(mcs.duration, 0, false);
             double option_profit = option.call ? std::max(wps.getPrice() - option.strike, 0.0) : std::max(option.strike - wps.getPrice(), 0.0);
-            options_profit.push_back(discount_rate*option_profit);
-
+            options_profit.push_back(discount_rate * option_profit);
 
             if (i % 10 == 0)
             {
-                //OPTIMISABLE!!!
+                // OPTIMISABLE!!!
                 mcs_approx_price = calculateAverage(options_profit);
                 mcs_progress = (double)i / mcs.iterations;
             }
         }
     }
-    mcs_progress = 100.0;
+    mcs_progress = 1.0;
     mcs_approx_price = calculateAverage(options_profit);
-    mcs_running =false;
+    mcs_finish = true;
 }
 
-void stopMonteCarloThread(){
-    if (mcs_running){
-        mcs_stop =true;
-        if (mcs_thread.joinable()){
+void stopMonteCarloThread()
+{
+    if (mcs_running)
+    {
+        mcs_stop = true;
+        if (mcs_thread.joinable())
+        {
             mcs_thread.join();
-
         }
-        mcs_stop =false;
-        mcs_running =false;
-        
+        mcs_stop = false;
+        mcs_running = false;
     }
+}
+
+double runMonteCarloSim(int start, int end, MonteCarloSimulation mcs, Option option)
+{
+    mcs.iterations = end - start;
+    return mcs.estimateOption(option);
+}
+
+double runMonteCarloMultiThreading(int n_threads, MonteCarloSimulation mcs, Option option)
+{
+    std::vector<std::thread> threads;
+    std::vector<double> results(n_threads);
+
+    int trials_per_thread = mcs.iterations / n_threads;
+    for (int i = 0; i < n_threads; ++i)
+    {
+        int start = i * trials_per_thread;
+        int end = (i == n_threads - 1) ? mcs.iterations : (i + 1) * trials_per_thread;
+
+        threads.emplace_back([&, start, end, i]()
+                             { results[i] = runMonteCarloSim(start, end, mcs, option); }
+
+        );
+    }
+    for (auto &thread : threads)
+    {
+        thread.join();
+    }
+    double final_result = std::accumulate(results.begin(), results.end(), 0.0) / mcs.iterations;
+    return final_result;
 }
