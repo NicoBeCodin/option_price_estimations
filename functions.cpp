@@ -29,6 +29,12 @@ std::atomic<bool> mcs_finish(false);
 std::mutex mcs_mutex;
 std::thread mcs_thread;
 
+//For multithreaded montecarlo simulation
+std::thread mcs_multithread;
+std::atomic<bool> mcs_multithread_running(false);
+std::atomic<int> mcs_multithread_progress(0);
+
+
 /*
 Project structure:
 MonteCarlo manages the WeinerProcesses
@@ -261,9 +267,10 @@ void stopCurrentSimulation()
 
 MonteCarloSimulation::MonteCarloSimulation(int iter, int durat, double dt, Asset stock, bool show_inc) : iterations(iter), duration(durat), stock(stock), increment(dt), show(show_inc) {}
 
+
 double MonteCarloSimulation::estimateOption(Option option)
 {
-    printf("Running simulation of option price...\n");
+    
     /*
     Given an option properties, evaluate it's profitability knowing that prof=0 should be the bsOptionPrice
     */
@@ -293,9 +300,16 @@ double MonteCarloSimulation::estimateOption(Option option)
         }
         option_profit.push_back(profit);
     }
+    return calculateAverage(option_profit);
+}
 
-    double average_profit = calculateAverage(option_profit);
-    return average_profit;
+double MonteCarloSimulation::estimateOptionSingleTrial(Option option){
+    WeinerProcessSimulator wps(stock.price, stock.drift, stock.volatility, increment, true);
+    wps.runSimulation(duration, 0, show);
+    double finalPrice = wps.getPrice();
+
+    return (option.call) ? std::max(finalPrice - option.strike,0.0) : std::max(option.strike - finalPrice, 0.0);
+
 }
 
 void runMonteCarloThread(MonteCarloSimulation &mcs, Option &option)
@@ -343,32 +357,63 @@ void stopMonteCarloThread()
     }
 }
 
-double runMonteCarloSim(int start, int end, MonteCarloSimulation mcs, Option option)
-{
-    mcs.iterations = end - start;
-    return mcs.estimateOption(option);
+void stopMonteCarloMultiThread(){
+    if (mcs_multithread.joinable()){
+        mcs_multithread.join();
+    }
 }
 
-double runMonteCarloMultiThreading(int n_threads, MonteCarloSimulation mcs, Option option)
+double runMonteCarloSim(int start, int end, MonteCarloSimulation &mcs, Option option)
 {
+    std::vector<double> profits;
+    int length = end - start;
+    for (int i =0; i<length; ++i){
+        profits.push_back(mcs.estimateOptionSingleTrial(option));
+        mcs_multithread_progress.fetch_add(1, std::memory_order_relaxed);
+    }
+    return calculateAverage(profits);
+}
+
+double runMonteCarloMultiThreading(int n_threads, MonteCarloSimulation &mcs, Option option)
+{
+    mcs_multithread_running =true;
+    mcs_multithread_progress =0;
+    
     std::vector<std::thread> threads;
     std::vector<double> results(n_threads);
+    
+    int n_trials = mcs.iterations;
 
-    int trials_per_thread = mcs.iterations / n_threads;
+    //Make sure the workload between threads is even
+    while (n_trials % n_threads != 0){
+        ++n_trials;
+    }
+
+    int trials_per_thread = n_trials / n_threads;
     for (int i = 0; i < n_threads; ++i)
     {
         int start = i * trials_per_thread;
-        int end = (i == n_threads - 1) ? mcs.iterations : (i + 1) * trials_per_thread;
+        int end = (i+1) * trials_per_thread;
 
         threads.emplace_back([&, start, end, i]()
-                             { results[i] = runMonteCarloSim(start, end, mcs, option); }
 
+                             {  
+                                results[i] = runMonteCarloSim(start, end, std::ref(mcs), option); 
+                                }
         );
+        
     }
-    for (auto &thread : threads)
+
+    for (auto &thread : threads)    
     {
+        if (thread.joinable()){
         thread.join();
+
+        }
     }
-    double final_result = std::accumulate(results.begin(), results.end(), 0.0) / mcs.iterations;
-    return final_result;
+    threads.clear();
+    mcs_multithread_running =false;
+    double average_result = calculateAverage(results);
+    results.clear();
+    return average_result;
 }

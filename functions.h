@@ -29,6 +29,12 @@ extern std::atomic<bool> mcs_finish;
 extern std::mutex mcs_mutex;
 extern std::thread mcs_thread;
 
+
+extern std::thread mcs_multithread;
+
+extern std::atomic<bool> mcs_multithread_running;
+extern std::atomic<int> mcs_multithread_progress;
+
 struct Asset
 {
     std::string name;
@@ -77,14 +83,17 @@ public:
     Asset stock;
     double increment;
     bool show;
-    MonteCarloSimulation(int iter, int durat, double dt, Asset stock, bool show);
     double estimateOption(Option option);
+    double estimateOptionSingleTrial(Option option);
+    MonteCarloSimulation(int iter, int durat, double dt, Asset stock, bool show);
 };
 
 void runMonteCarloThread(MonteCarloSimulation &mcs, Option &option);
 void stopMonteCarloThread();
 
-double runMonteCarloSim(int start, int end, MonteCarloSimulation mcs, Option option);
-double runMonteCarloMultiThreading(int n_threads, MonteCarloSimulation mcs, Option option);
+
+void stopMonteCarloMultiThread();
+double runMonteCarloSim(int start, int end, MonteCarloSimulation &mcs, Option option);
+double runMonteCarloMultiThreading(int n_threads, MonteCarloSimulation &mcs, Option option);
 
 #endif //

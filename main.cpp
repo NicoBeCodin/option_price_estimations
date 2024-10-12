@@ -111,6 +111,9 @@ int main()
 
     double mcs_current_price;
     double mcs_progress_bar;
+    int n_threads = std::thread::hardware_concurrency(); 
+    double mcs_multithread_result =0.0;
+    bool show_mcs_multithread_result =false;
 
     // Simulation characteristics
     int n_trials = 100;
@@ -152,11 +155,13 @@ int main()
         ImGui::InputDouble("Stock drift: ", &stock_dri);
         ImGui::InputDouble("Strike price: ", &sim_option_strike);
         ImGui::InputDouble("risk free interest rate:", &interest_rate);
+        ImGui::InputDouble("Time to expiration (years): ", &t_sim);
         ImGui::Checkbox("Call: (empty means put)", &call);
 
         ImGui::InputInt("Number of trials: ", &n_trials);
         ImGui::InputInt("Number of steps per trial: ", &n_trial_steps);
-        ImGui::InputDouble("Time to expiration (years): ", &t_sim);
+        ImGui::InputInt("thread number ", &n_threads);
+    
         ImGui::Checkbox("Show steps in simulation:", &show);
         ImGui::InputInt("Binomial tree size: ", &tree_size);
 
@@ -187,6 +192,32 @@ int main()
             }
         }
 
+        if (ImGui::Button("Run multithreaded MonteCarlo simulation")){
+            stopMonteCarloMultiThread();
+            Asset simulated_stock = {"ABC", stock_init_price, stock_dri, stock_vol, interest_rate};
+
+            double step_size = t_sim / (double)n_trial_steps;
+            
+            MonteCarloSimulation mc_sim_multithread(n_trials, n_trial_steps, step_size, simulated_stock, show);
+            Option sim_option;
+            sim_option.stock = simulated_stock;
+            sim_option.call = call;
+            sim_option.strike = sim_option_strike;
+            
+
+            mcs_multithread = std::thread([&]() {
+        // This runs the simulation on a separate thread and stores the result
+            
+            mcs_multithread_result = exp(-interest_rate * t_sim) * runMonteCarloMultiThreading(n_threads, std::ref(mc_sim_multithread), sim_option);
+        
+        // Once the simulation is finished, update the running flag
+
+            });
+            
+            show_mcs_multithread_result =true;
+
+        }
+
         if (ImGui::Button("Calculate Black-Scholes Price"))
         {
             show_bs_price = true;
@@ -199,7 +230,7 @@ int main()
             american_option_price = binomialOptionPrice(call, stock_init_price, sim_option_strike, interest_rate, t_sim, stock_vol, tree_size = 100, false);
         }
 
-        if (show_mcs_result = true)
+        if (show_mcs_result)
         {
 
             if (mcs_running && !mcs_finish)
@@ -216,6 +247,16 @@ int main()
             {
                 ImGui::Text("MonteCarlo simulation price estimate: %.2f", mcs_current_price);
             }
+        }
+        if (show_mcs_multithread_result){
+            if (mcs_multithread_running){
+                float progress = (float)mcs_multithread_progress / (float)n_trials;
+                ImGui::ProgressBar(progress, ImVec2(0.0f, 0.0f));
+             } else {
+                
+                double result = mcs_multithread_result;
+                ImGui::Text("Multithread MonteCarlo simulation price estimate: %.2f", mcs_multithread_result);
+             }
         }
 
         if (show_bs_price)
