@@ -150,20 +150,20 @@ int main()
         ImGui::SetNextWindowSize(ImVec2(200, 500), ImGuiCond_FirstUseEver);
         ImGui::Begin("Option price estimator");
 
-        ImGui::InputDouble("Initial stock price: ", &stock_init_price);
-        ImGui::InputDouble("Stock volatililty: ", &stock_vol);
-        ImGui::InputDouble("Stock drift: ", &stock_dri);
-        ImGui::InputDouble("Strike price: ", &sim_option_strike);
-        ImGui::InputDouble("risk free interest rate:", &interest_rate);
-        ImGui::InputDouble("Time to expiration (years): ", &t_sim);
+        ImGui::InputDouble("Initial stock price", &stock_init_price);
+        ImGui::InputDouble("Stock volatililty", &stock_vol);
+        ImGui::InputDouble("Stock drift ", &stock_dri);
+        ImGui::InputDouble("Strike price ", &sim_option_strike);
+        ImGui::InputDouble("risk free interest rate", &interest_rate);
+        ImGui::InputDouble("Time to expiration (years)", &t_sim);
         ImGui::Checkbox("Call: (empty means put)", &call);
 
-        ImGui::InputInt("Number of trials: ", &n_trials);
-        ImGui::InputInt("Number of steps per trial: ", &n_trial_steps);
+        ImGui::InputInt("Number of trials", &n_trials);
+        ImGui::InputInt("Number of steps per trial", &n_trial_steps);
         ImGui::InputInt("thread number ", &n_threads);
     
-        ImGui::Checkbox("Show steps in simulation:", &show);
-        ImGui::InputInt("Binomial tree size: ", &tree_size);
+        ImGui::Checkbox("Show steps in simulation", &show);
+        ImGui::InputInt("Binomial tree size", &tree_size);
 
         if (ImGui::Button("Run MonteCarlo simulation"))
         {
