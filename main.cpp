@@ -15,10 +15,6 @@
 /*FUTURE IDEAS
 More choice of distributions, not just simple weiner process
 Weiner process itself is can be rewritten with fourier series
-
-TODO:
-change i++ to ++i
-
 */
 
 bool InitOpenGL(GLFWwindow **window);
@@ -29,43 +25,6 @@ int main()
 
     printf("Launching program... \n");
 
-    /*
-        Option pricing simulation
-    */
-    // Model the volatility of a stock on a month
-    // const std::string stock_name = "ABC";
-    // const double stock_initial_price = 100.0;
-    // const double stock_volatility = 0.6; // corresponds to an IV of 60%
-    // const double stock_drift = 0.0;
-    // Asset test_stock = {stock_name, stock_initial_price, stock_drift, stock_volatility};
-    // const bool show_inc = false;
-    // std::cout << "Stock name : " << stock_name << std::endl;
-    // printf("price %f , vol %f \n", stock_initial_price, stock_volatility);
-
-    // // Number of stocks simulated
-    // const int trials = 300;
-    // const int duration = 100;     // Duration of the simulation (how many steps)
-    // const double real_time = 1.0; // how much time compared to a year is the stock simulated from
-    // const double step_size = real_time / (double)duration;
-    // printf("Number of stocks simulated: %d , duration of simulation: %d , time step %f\n", trials, duration, step_size);
-    // MonteCarloSimulation mcs(trials, duration, step_size, test_stock, show_inc);
-    // const double option_premium = 8.0;
-    // const double option_strike = 110.0;
-    // const double risk_free = 0.04;
-
-    // const double option_time_to_exp = real_time; // Time to exp is linked to duration of a trial
-    // const int step_number = 10;                  // number of steps for binomial pricing
-    // const bool show_pricing_steps = false;
-
-    // Option test_call = {test_stock, true, option_premium, option_strike, option_time_to_exp};
-
-    // double option_expected_premium = exp(-risk_free * real_time) * mcs.estimateOption(test_call);
-    // double bsPrice = bsOptionPrice(true, stock_initial_price, option_strike, risk_free, option_time_to_exp, stock_volatility);
-    // double americanOptionPrice = binomialOptionPrice(true, stock_initial_price, option_strike, risk_free, option_time_to_exp, stock_volatility, step_number, show_pricing_steps);
-
-    // printf("stock_init_price %f , option_premium %f, option_strike %f , r = %f, option_time_to_exp %f, stock_volatility %f \n", stock_initial_price, option_premium, option_strike, risk_free, option_time_to_exp, stock_volatility);
-    // printf("B-S price: %f\nMontecarlo price: %f\nAmerican option price w/ binomial pricing: %f\n", bsPrice, option_expected_premium, americanOptionPrice);
-
     // Graphics rendering
 
     // tries to init the glfw lib
@@ -75,7 +34,7 @@ int main()
     }
 
     // Tries to create a new window
-    GLFWwindow *window = glfwCreateWindow(1280, 720, "ImGui Test", NULL, NULL);
+    GLFWwindow *window = glfwCreateWindow(1280, 720, "option pricing", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -99,14 +58,14 @@ int main()
     std::string sim_stock_name = "ABC";
     double stock_init_price = 100.0;
     double stock_vol = 0.6;
-    double stock_dri = 0.0;
+    
     double black_scholes_price = 0.0;
     double american_option_price = 0.0;
     bool show_binomial = false;
     int tree_size = 100;
     double sim_option_strike = 110.0;
     bool call = true;
-    bool calculate_montecarlo = false;
+    
     bool show_mcs_result = false;
 
     double mcs_current_price;
@@ -116,24 +75,20 @@ int main()
     bool show_mcs_multithread_result =false;
 
     // Simulation characteristics
-    int n_trials = 100;
-    int n_trial_steps = 200;
+    int n_trials = 1000;
+    int n_trial_steps = 500;
     double t_sim = 1.0;
     bool show = false;
 
     double sim_drift = 0.0;
     double sim_sigma = 0.5;
     double sim_step_size = 0.01;
-    bool sim_show_steps = false;
 
     double interest_rate = 0.04;
+    double stock_dri = interest_rate;
 
-    double result = 0.0;
     bool show_bs_price = false;
-    bool show_result = false;
-    bool show_sim_result = false;
-    bool sim_stop = false;
-    int ms_delay = 10;
+
     double init_price_process = 50.0;
     WeinerProcessSimulator wps(init_price_process, sim_drift, sim_sigma, sim_step_size, sim_stop);
 
@@ -152,7 +107,7 @@ int main()
 
         ImGui::InputDouble("Initial stock price", &stock_init_price);
         ImGui::InputDouble("Stock volatililty", &stock_vol);
-        ImGui::InputDouble("Stock drift ", &stock_dri);
+        ImGui::InputDouble("Stock drift (default is r)", &stock_dri);
         ImGui::InputDouble("Strike price ", &sim_option_strike);
         ImGui::InputDouble("risk free interest rate", &interest_rate);
         ImGui::InputDouble("Time to expiration (years)", &t_sim);
@@ -165,32 +120,6 @@ int main()
         ImGui::Checkbox("Show steps in simulation", &show);
         ImGui::InputInt("Binomial tree size", &tree_size);
 
-        if (ImGui::Button("Run MonteCarlo simulation"))
-        {
-            mcs_finish = false;
-            printf("Running montecarlo simulation...");
-            stopMonteCarloThread();
-            Asset simulated_stock = {"ABC", stock_init_price, stock_dri, stock_vol, interest_rate};
-
-            double step_size = t_sim / (double)n_trial_steps;
-            MonteCarloSimulation mc_sim(n_trials, n_trial_steps, step_size, simulated_stock, show);
-            Option sim_option;
-            sim_option.stock = simulated_stock;
-            sim_option.call = call;
-            sim_option.strike = sim_option_strike;
-
-            mcs_thread = std::thread(runMonteCarloThread, std::ref(mc_sim), std::ref(sim_option));
-
-            // result = exp(-interest_rate * t_sim) * mc_sim.estimateOption(sim_option);
-            show_mcs_result = true;
-        }
-        if (show_mcs_result && !mcs_finish && mcs_running)
-        {
-            if (ImGui::Button("Stop MonteCarlo Simulation"))
-            {
-                stopMonteCarloThread();
-            }
-        }
 
         if (ImGui::Button("Run multithreaded MonteCarlo simulation")){
             stopMonteCarloMultiThread();
@@ -241,7 +170,7 @@ int main()
                     mcs_progress_bar = mcs_progress;
                 }
 
-                ImGui::Text("Simulation progress %.1f % \nApproximating price: %.2f ", mcs_progress_bar * 100.0, mcs_current_price);
+                ImGui::Text("Simulation progress %.1f % \n Approximating price: %.2f ", mcs_progress_bar * 100.0, mcs_current_price);
             }
             else if (mcs_finish)
             {
@@ -254,7 +183,6 @@ int main()
                 ImGui::ProgressBar(progress, ImVec2(0.0f, 0.0f));
              } else {
                 
-                double result = mcs_multithread_result;
                 ImGui::Text("Multithread MonteCarlo simulation price estimate: %.2f", mcs_multithread_result);
              }
         }
@@ -271,51 +199,6 @@ int main()
 
         ImGui::End();
         // End of first window
-
-        // second window, simulation window
-        ImGui::SetNextWindowSize(ImVec2(200, 500), ImGuiCond_FirstUseEver);
-        ImGui::Begin("Simulate price movements");
-
-        ImGui::InputInt("Delay in ms", &ms_delay);
-        ImGui::InputDouble("Initial price", &init_price_process);
-        ImGui::InputDouble("Drift: ", &sim_drift);
-        ImGui::InputDouble("Volatility: ", &sim_sigma);
-        ImGui::InputDouble("Step size: ", &sim_step_size);
-        ImGui::Checkbox("Show steps: ", &sim_show_steps);
-
-        ImGui::Checkbox("Stop simulation: ", &sim_stop);
-
-        if (ImGui::Button("Run simulation: ") && !sim_running)
-        {
-            stopCurrentSimulation();
-            WeinerProcessSimulator wps(init_price_process, sim_drift, sim_sigma, sim_step_size, sim_stop);
-
-            simulation_thread = std::thread(runSimulationThread, ms_delay, std::ref(wps), sim_show_steps);
-            show_sim_result = true;
-        }
-        if (ImGui::Button("Stop simulation"))
-        {
-            // Stop simulation
-            stopCurrentSimulation();
-        }
-
-        std::string state = sim_paused ? "Resume simulation" : "Pause simulation";
-        if (ImGui::Button(state.c_str()))
-        {
-            // resume
-            sim_paused = !sim_paused;
-        }
-        if (show_sim_result)
-        {
-            double sim_price;
-            {
-                std::lock_guard<std::mutex> lock(sim_mutex);
-                sim_price = current_price;
-            }
-            ImGui::Text("Price: %.2f", sim_price);
-        }
-
-        ImGui::End();
 
         ImGui::Render();
 

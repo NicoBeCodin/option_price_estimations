@@ -19,7 +19,7 @@ OBJS = $(SRCS:%.cpp=%.o)
 VPATH = imgui backends
 
 # Executable name
-EXEC = montecarlo_pricing
+EXEC = option_pricing
 
 LIBS = -lglfw -lGL -ldl -lpthread -lX11
 

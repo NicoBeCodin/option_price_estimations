@@ -188,8 +188,6 @@ void WeinerProcessSimulator::simulateStep(bool show)
 
     // Geometric brownian motion
     double dW = sqrt(dt) * generateNormal(0.0, 1.0);
-    // double increment = mu*price*dt + sigma*price*dW;
-    // price += increment;
 
     double new_price = price * exp((mu - 0.5 * pow(sigma, 2.0)) * dt + sigma * dW);
 
@@ -267,7 +265,6 @@ void stopCurrentSimulation()
 
 MonteCarloSimulation::MonteCarloSimulation(int iter, int durat, double dt, Asset stock, bool show_inc) : iterations(iter), duration(durat), stock(stock), increment(dt), show(show_inc) {}
 
-
 double MonteCarloSimulation::estimateOption(Option option)
 {
     
@@ -308,7 +305,7 @@ double MonteCarloSimulation::estimateOptionSingleTrial(Option option){
     wps.runSimulation(duration, 0, show);
     double finalPrice = wps.getPrice();
 
-    return (option.call) ? std::max(finalPrice - option.strike,0.0) : std::max(option.strike - finalPrice, 0.0);
+    return (option.call) ? std::max(finalPrice - option.strike , 0.0) : std::max(option.strike - finalPrice , 0.0);
 
 }
 
